@@ -3,7 +3,16 @@ Factors Affecting Life Expectancy
 Josphine Njagi
 2024-12-06
 
+<<<<<<< HEAD
 # DATA ANALYSIS
+=======
+Overview
+
+Life expectancy serves as a critical indicator of population health and societal well-being. Multiple factors influence an individual's ability to live longer, including access to quality healthcare, nutrition, education, economic conditions, and disease prevention measures.
+With global health disparities and varying mortality rates across different regions, understanding the key determinants of life expectancy has become increasingly important for policymakers, healthcare professionals, and researchers.
+This comprehensive analysis examines the relationship between various socioeconomic, health, and demographic factors and their impact on life expectancy outcomes. Using statistical modeling and data-driven approaches, this study aims to identify the most significant predictors of life expectancy and provide actionable insights for improving population health outcomes.
+Key Objectives
+>>>>>>> 17cac1245c0d6b8a9bdfe1334252bd668a834fc6
 
 # FACTORS AFFECTING LIFE EXPECTANCY
 
