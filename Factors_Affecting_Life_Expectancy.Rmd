@@ -2,16 +2,9 @@
 title: "Factors Affecting Life Expectancy"
 author: "Josphine Njagi"
 date: "2024-12-06"
-output:
-  pdf_document: default
-  html_document:
-    df_print: paged
-latex_engine: xelatex
-mainfont: Times New Roman
-fontsize: 12pt
-editor_options:
-  markdown:
-    wrap: 72
+output: 
+  github_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
