@@ -1,0 +1,1466 @@
+---
+title: "Factors Affecting Life Expectancy"
+author: "Josphine Njagi"
+date: "2024-12-06"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+latex_engine: xelatex
+mainfont: Times New Roman
+fontsize: 12pt
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE, # Suppresses package messages 
+                      warning = FALSE,  # Suppresses warnings)
+                      options(repos = c(CRAN = "https://cran.r-project.org"))
+)
+suppressMessages(suppressWarnings(library(corrplot)))
+suppressMessages(suppressWarnings(library(Amelia)))
+```
+
+# DATA ANALYSIS
+
+# FACTORS AFFECTING LIFE EXPECTANCY
+
+## Overview
+
+Life expectancy serves as a critical indicator of population health and
+societal well-being. Multiple factors influence an individual's ability
+to live longer, including access to quality healthcare, nutrition,
+education, economic conditions, and disease prevention measures. With
+global health disparities and varying mortality rates across different
+regions, understanding the key determinants of life expectancy has
+become increasingly important for policymakers, healthcare
+professionals, and researchers. This comprehensive analysis examines the
+relationship between various socioeconomic, health, and demographic
+factors and their impact on life expectancy outcomes. Using statistical
+modeling and data-driven approaches, this study aims to identify the
+most significant predictors of life expectancy and provide actionable
+insights for improving population health outcomes.
+
+### **a) Methodology and Approach** 
+
+This analysis employs a systematic approach to understand life
+expectancy determinants: The analysis utilizes the life_expectancy.csv
+file from World Health Organization (WHO) public database, which
+contains comprehensive health, economic, and demographic indicators
+across multiple countries and time periods.
+
+### b) Analysis Framework:
+
+1.  Data Inspection and Cleaning: Comprehensive examination of data
+    quality, including identification and treatment of missing values,
+    outliers, and data inconsistencies to ensure robust analytical
+    foundations.
+2.  Exploratory Data Analysis (EDA): Investigation of life expectancy
+    distribution patterns Correlation analysis to identify relationships
+    between variables Identification of the most highly correlated
+    factors with life expectancy
+3.  Hypothesis Testing: Statistical validation of four key hypotheses
+    regarding relationships between specific factors and life expectancy
+    outcomes.
+4.  Predictive Modeling:
+    -   Multiple linear regression analysis to quantify factor impacts
+    -   Feature engineering and variable selection techniques Model
+        optimization through systematic variable elimination based on
+        statistical significance and practical importance Advanced
+        Analytics:
+5.  Principal Component Analysis (PCA) to identify underlying patterns
+    and reduce dimensionality while preserving essential information.
+6.  Executive summary
+
+```{r, include=FALSE}
+
+# ## **1.1. R PACKAGES**
+# 
+# Install the necessary R packages for the analysis
+
+library(dplyr)
+library(readr)
+install.packages('dplyr')
+library(ggplot2)
+library(scales)  # For the percent() function
+library(tidyr)
+install.packages("corrplot")
+library(corrplot)
+install.packages("Amelia")
+library(Amelia)
+install.packages("naniar")
+library(naniar)
+install.packages("rmarkdown")
+library(cowplot)
+
+```
+
+## 1. Inspecting and Cleaning the Data
+
+### 1.1. Load the life expectancy and read it
+
+Before I analyse factors affecting life expectancy, I need to understand
+the data set first. I will begin by loading the data set and inspecting
+its structure to understand its characteristics. The life expectancy
+data set is a data set with the average life expectancy of 193
+countries, alongside other information collected that can describe each
+country. The information includes gdp, death mortality, hiv and aids
+mortality, infant mortality amongst other variables. Below is a quick
+overview of the data.
+
+```{r}
+file_path <- "C:\\Users\\njagi\\OneDrive\\Documents\\R Projects\\life_expectancy.csv"
+df <- read.csv(file_path)
+str(df)
+```
+
+The data set has 2838 rows and 19 columns, and all the variables are
+numerical except country and status columns.
+
+Below are the descriptions of each variable
+
+```{r}
+Variable <- c("country", "year", "status", "life_expectancy", "adult_mortality", 
+              "infant_deaths", "alcohol", "percentage_expenditure", "hepatitis_b", 
+              "measles", "bmi", "under_five_deaths", "polio", "total_expenditure", 
+              "diphtheria", "hiv_aids", "gdp", "population", "schooling")
+
+Description <- c(
+  "Country name", "Year of the observation", "Developed or Developing status", 
+  "Life Expectancy in years", 
+  "Adult Mortality Rates (number of deaths per 1,000 adults aged 15-60)",
+  "Number of Infant Deaths per 1,000 population", 
+  "Alcohol consumption per capita (liters)",
+  "Expenditure on health as % of GDP per capita", 
+  "Hepatitis B immunization coverage (%)", 
+  "Measles cases per 1,000 population", 
+  "Average Body Mass Index (BMI)", 
+  "Under-five deaths per 1,000 population", 
+  "Polio immunization coverage (%)", 
+  "Government expenditure on health (%)", 
+  "Diphtheria immunization coverage (%)", 
+  "HIV/AIDS deaths per 1,000 live births (ages 0-4)", 
+  "Gross Domestic Product (GDP) per capita (USD)", 
+  "Population size", 
+  "Average years of schooling")
+
+variable_table <- data.frame(Variable, Description)
+knitr::kable(variable_table, caption = "**Description of Variables**")
+```
+
+Some comments;
+
+The difference between **under_five_deaths** and **infant_deaths**
+according to
+[[wikipedia]](https://en.wikipedia.org/wiki/Child_mortality) is
+**under_five_deaths** is the number of deaths of an infant before their
+first birthday, while **under_five_deaths** is the number of deaths a
+child before their 5th birthday
+
+### 1.2 **Summary of Data Structure**
+
+Having a quick overview of the summary statistics of the data set, I see
+some **Concerning Outliers**
+
+```{r}
+summary(df)
+```
+
+And here is the distribution of every variable so as to understand the
+spread better.
+
+```{r, fig.width=12, fig.height=12}
+df_num <- df %>% select_if(is.numeric)
+
+df_num %>% 
+  gather(key = key, value = value) %>% 
+  mutate(key = as.factor(key)) %>% 
+  filter(!is.na(value)) %>%  # Remove non-finite values
+  ggplot(aes(x = value, fill = key)) +
+  geom_histogram(colour = "black", bins = 30) +  # Explicitly set bins
+  facet_wrap(~key, scales = "free", ncol = 5) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    strip.background = element_rect(fill = "grey")
+  ) +
+  labs(x = "Values", y = "Count", title = "Histograms of All Numeric Variables")
+```
+
+#### 1.2.1 Outliers
+
+In **measles**, **infant_deaths** and **under_five_death** variables,
+Some values exceed 1,000,which seems unrealistic given it is measured
+per 1,000 population. However, I cross-checked the data against the
+World Health Organization (WHO) website for reported data cases and the
+figures matched the official WHO data. Even the maximum value of
+measles - 212183 for year 2000 in Nigeria match WHO data. So I left the
+figures like that.[[measles data on WHO
+website]](https://immunizationdata.who.int/global/wiise-detail-page/measles-reported-cases-and-incidence?GROUP=Countries&YEAR=),
+[[Infant deaths and Under five deaths data on WHO
+website]](https://data.worldbank.org/indicator/SH.DTH.IMRT?end=2015&locations=IN&start=2000).
+*It is important to note that these figures are wrong regardless and
+should be investigated further against WHO database and should be
+probably removed.*
+
+```{r}
+
+##Code for outliers in measles, under five deaths and infant deaths
+
+## which observations had over 1000 for Measles
+
+over_1000_outliers <- df %>% select(country, year, measles) %>% filter(measles > 1000) %>% 
+  group_by(country,year, measles) %>% arrange(desc(measles))
+head(over_1000_outliers)
+## Acouple of countries with over 1000 measles
+
+
+## which observations had over 1000 for infant deaths,  under five deaths
+
+over_1000_outliers_infant <- df %>% select(country, year, infant_deaths, under_five_deaths) %>% filter(infant_deaths > 1000 & under_five_deaths > 1000) %>% 
+  group_by(country,year, infant_deaths, under_five_deaths) %>% arrange(desc(infant_deaths))
+head(over_1000_outliers_infant) 
+
+##India only has over 1000 infant and under five figures
+
+
+```
+
+In **year** variable, I also noticed that year 2013 was over
+represented. The other years had 183 countries while 2013 had 193
+countries. Upon further investigation, I realized that these extra
+countries in 2013 did not have data for any other year. Furthermore,
+they were less known countries, so I made the decision to remove them
+from the data set.
+
+Table showing extra 10 countries in 2013
+
+```{r}
+# ### Year Variable
+# 
+# -   Year has same observations for all countries except one country that
+#     is over Representative
+
+year_summary <- df %>% group_by(year) %>% summarise(count = n())
+
+knitr::kable(year_summary, caption = "Years Summary")
+```
+
+Table showing countries with one observation only. These countries will
+be removed from the data set. *NB:* *Use them only if you are analyzing
+specifically and only 2013*
+
+```{r}
+## I see that 2013 has 10 more observations compared to other years that have same observations
+
+# Which countries are these
+##now I want to check for each country, does it have observations for all the 16 years? (2000 - 2015)
+country_years <- df %>%
+  group_by(country) %>%
+  summarise(observations = n()) %>% arrange((observations))
+
+head(country_years, n = 13)
+#knitr::kable(country_years, caption = "Years Summary")
+
+#Those first 10 countries have observations for one year only \~ 2013.
+#Which data do they have?
+one_observation_countries <- df %>%
+  filter(country %in% c("Cook Islands","Dominica", "Marshall Islands", "Monaco", "Nauru", "Niue", 
+                         "Palau", "Saint Kitts and Nevis", "San Marino", "Tuvalu"))
+#one_observation_countries
+
+# Get rid of one observation countries
+df <- df %>%
+  filter(!country %in% c("Cook Islands","Dominica", "Marshall Islands", "Monaco", "Nauru", "Niue", 
+                         "Palau", "Saint Kitts and Nevis", "San Marino", "Tuvalu"))
+
+
+```
+
+I also noticed that the **Alcohol** variable distribution had concerning
+high number of zeros. Was this true representation of alcohol
+consumption or were there some response bias from countries where
+alcohol is ffrowned upon conservative Islamic countries? While this
+could be true, I decided not to prob further and leave the figures as
+they were.
+
+The HIV and AIDS variable had a high number of 0 cases. I
+counter-checked with WHO and the values were indeed correct.
+
+#### 1.2.2 Check for missing values
+
+Next I will inspect the data set for null values, that might affect the
+validity of my analysis.
+
+The Figure below shows the missing data patterns in the data set.
+
+```{r}
+missmap(df, 
+        main = "Missing Data Heatmap", 
+        col = c("yellow", "black"), 
+        legend = TRUE)
+
+```
+
+From the image it seems that the data is missing at random.
+
+To understand the missingness further, we will inspect the count of each
+variable's missing data.
+
+The table below shows the count and the percentage missing values for
+each variable.
+
+```{r}
+missing_summary <- data.frame(
+  Variable = names(df),
+  Missing_Count = colSums(is.na(df)),
+  Missing_Percentage = colSums(is.na(df)) / nrow(df) * 100)
+
+knitr::kable(missing_summary, caption = "Missing Observations")
+
+```
+
+It follows that we have to deal with these missing values before we do
+any analysis or make any conclusions about factors affecting life
+expectancy to avoid bias.
+
+##### 1.2.2.1 Deal with the missing values
+
+For the purposes of imputation, I replaced the missing values with
+either mean or median depending on whether the variable's distribution
+was skewed or normal. I also separated the replacement by status since
+for most variables, the distribution was different for both developing
+and developed.
+
+*NB: For Population and GDP, the values could be looked up in public
+databases.*
+
+**The following chart shows the distribution of variables that have
+missing values**
+
+```{r, fig.width=12, fig.height=12}
+## I want to see the distribution of variables that have missing values only 
+
+# Get the variables that have missing values only
+missing_data_variables <- missing_summary %>%
+  filter(Missing_Count > 0) %>%
+  pull(Variable) 
+
+
+#Visualize those variables in a density histogram to see their distribution by status
+
+df %>% select(status, missing_data_variables, -country) %>% 
+  gather(key = key, value = value, -status) %>%  
+  mutate(key = as.factor(key)) %>% 
+  filter(!is.na(value)) %>%  
+  ggplot(aes(x = value, fill = status)) +  
+  geom_density(alpha = 0.4) +  
+  facet_wrap(~key, scales = "free", ncol = 5) +  # Facet by variable
+  theme_classic() +
+  theme(
+    legend.position = "bottom", 
+    strip.text = element_text(size = 10, face = "bold")  
+  ) +
+  labs(
+    x = "Values", 
+    y = "Density",  # Change label to 'Density'
+    title = "Density Plots of All Numeric Variables by Status"
+  )
+```
+
+```{r}
+# Now I can clean the data by replacing missing values by either mean or median, depending on the distribution.
+
+# total_expenditure's distribution was normal so I used median of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_total_expenditure_variable = ifelse(
+      is.na(total_expenditure),
+      mean(total_expenditure, na.rm = TRUE),
+      total_expenditure
+    )
+  ) %>%
+  ungroup()
+
+# bmi's distribution was bimodal normal so I used mean of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_bmi_variable = ifelse(
+      is.na(bmi),
+      mean(bmi, na.rm = TRUE),
+      bmi
+    )
+  ) %>%
+  ungroup()
+
+# alcohol's distribution was normal so I used mean of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_alcohol_variable = ifelse(
+      is.na(alcohol),
+      mean(alcohol, na.rm = TRUE),
+      alcohol
+    )
+  ) %>%
+  ungroup()
+
+# gdp's distribution was right skewed so I used median of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_gdp_variable = ifelse(
+      is.na(gdp),
+      median(gdp, na.rm = TRUE),
+      gdp
+    )
+  ) %>%
+  ungroup()
+
+# polio's distribution was left skewed so I used median of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_polio_variable = ifelse(
+      is.na(polio),
+      median(polio, na.rm = TRUE),
+      polio
+    )
+  ) %>%
+  ungroup()
+
+# schooling's distribution was normal so I used mean of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_schooling_variable = ifelse(
+      is.na(schooling),
+      mean(schooling, na.rm = TRUE),
+      schooling
+    )
+  ) %>%
+  ungroup()
+
+# hepatitis_b's distribution was left skewed so I used median of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_hepatitis_b_variable = ifelse(
+      is.na(hepatitis_b),
+      median(hepatitis_b, na.rm = TRUE),
+      hepatitis_b
+    )
+  ) %>%
+  ungroup()
+
+# diphtheria's distribution was left skewed so I used median of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_diphtheria_variable = ifelse(
+      is.na(diphtheria),
+      median(diphtheria, na.rm = TRUE),
+      diphtheria
+    )
+  ) %>%
+  ungroup()
+
+# population's distribution was right skewed so I used median of every status to replace missing values
+df <- df %>%
+  group_by(status) %>%
+  mutate(
+    new_population_variable = ifelse(
+      is.na(population),
+      median(population, na.rm = TRUE),
+      population
+    )
+  ) %>%
+  ungroup()
+
+```
+
+```{r}
+
+# After all the data cleaning, I had 9 new columns which had the cleaned
+# data namely and had 0 missing values
+
+
+missing_summary <- data.frame(
+  Variable = names(df),
+  Missing_Count = colSums(is.na(df)),
+  Missing_Percentage = colSums(is.na(df)) / nrow(df) * 100)
+
+##knitr::kable(missing_summary, caption = "Missing Observations")
+```
+
+```{r}
+# The the last rows in the table below shows the extra columns created
+# with 0 null values. Those columns then replaced the columns that had
+# null values
+# 
+# 
+# 1.  new_total_expenditure_variable
+# 2.  new_bmi_variable
+# 3.  new_alcohol_variable
+# 4.  new_gdp_variable
+# 5.  new_polio_variable
+# 6.  new_schooling_variable
+# 7.  new_hepatitis_b_variable
+# 8.  new_diphtheria_variable
+# 9.  new_population_variable
+# 
+# Check missingness again Now I need to drop the original variables that
+# had Nulls and call the new ones that I created, orgina names
+
+
+
+
+
+## keep the orginal df then create a new one with full data
+df_cleaned <- df %>%
+  select(-c(
+    total_expenditure, 
+    bmi, 
+    alcohol, 
+    gdp, 
+    polio, 
+    schooling, 
+    hepatitis_b, 
+    diphtheria,
+    population
+  ))
+
+# Rename new cleaned columns to their original names
+df_cleaned <- df_cleaned %>%
+  rename(
+    total_expenditure = new_total_expenditure_variable,
+    bmi = new_bmi_variable,
+    alcohol = new_alcohol_variable,
+    gdp = new_gdp_variable,
+    polio = new_polio_variable,
+    schooling = new_schooling_variable,
+    hepatitis_b = new_hepatitis_b_variable,
+    diphtheria = new_diphtheria_variable,
+    population = new_population_variable
+  )
+```
+
+After the imputation is done, the table below shows The resulting data
+frame without any missing data
+
+```{r}
+missing_summary <- data.frame(
+  Variable = names(df_cleaned),
+  Missing_Count = colSums(is.na(df_cleaned)),
+  Missing_Percentage = colSums(is.na(df_cleaned)) / nrow(df) * 100)
+
+knitr::kable(missing_summary, caption = "Missing Observations")
+
+##head(df_cleaned)
+```
+
+Now that all the data issues have been addressed, we can start our
+analysis.
+
+## 2 EXPLORATORY DATA ANALYSIS (EDA)
+
+Our end goal is to understand factors influencing life expectancy and if
+we can predict life expectancy from them.
+
+We will start by inspecting our dependent variable first to have some
+understanding on how it is distributed. Then I will explore correlation
+matrix and scatter plots to understand the relationships between my
+dependent variable and other variables so as to gather more insights
+before creating a model.
+
+#### **2.1 How is life expectancy distributed?**
+
+```{r}
+##inspect life expectancy distribution
+##looks like there are two peaks 
+#ggplot(df_cleaned) + aes(x=life_expectancy) + geom_histogram()
+
+
+## try density add transparency
+ggplot(df) + aes(x=life_expectancy, fill = status) + geom_density(alpha = 0.5) + labs(title = 'Distribution of life expectancy')
+```
+
+**Key take away**
+
+-   Developed countries have higher life expectancy.
+
+#### 2.2 Correlation Matrix
+
+First change the status category to numerical, and drop country and year
+because those are not important in our next steps.
+
+```{r}
+
+#I will store these changes in a new data frame df2, so as not to tamper
+# with the original data frame.
+# change status category to num type and drop unneeded columns
+df2 <- df_cleaned %>%
+  mutate(status = ifelse(status == "Developed", 1, 0)) %>% 
+  select(-country, year) 
+#head(df2)
+```
+
+**Create the correction matrix to identify relationships of every
+variable with life expectancy**
+
+```{r, fig.width=12, fig.height=12}
+cor_matrix2 <- cor(df2)
+# plot
+corrplot(cor_matrix2, method = "number", type = "upper", 
+         number.cex = 1.25)
+
+```
+
+From the above diagram, we see that life expectancy is highly positively
+correlated with
+
+1.  Schooling (0.74)
+2.  GDP (0.45)
+3.  BMI(0.56)
+4.  Alcohol (0.40)
+5.  polio (0.46)
+6.  Diphtheria (0.47)
+7.  percentage expenditure (0.38)
+
+and highly negatively correlated with
+
+1.  Hiv and Aids (-0.59)
+2.  Adult Mortality (-0.7025**) *Note: Be careful using mortality
+    measures as drivers of life expectancy; this can be a tautology
+    ("life expectancy is lower because more people die" is not a
+    surprise).***
+
+This starts to give us an idea of what factors positively or negatively
+influence life expectancy.
+
+##### 2.2.1 Investigate the top correlated Variables
+
+Next, we draw some scatter plots to see linear relationship of life
+expectancy with its key drivers (high correlation)
+
+```{=html}
+Note: Adult mortality will be excluded moving forward due to tautology
+```
+
+```{r, fig.width=12, fig.height=12}
+
+##Here I will use the cleaned data frame that had status as developed and developing so as to see the relationship of top performers and life expectancy clearly
+
+# variables_corr <- df_cleaned %>% 
+#   select(status, life_expectancy, alcohol, bmi, schooling, gdp,
+#                 percentage_expenditure, polio, diphtheria, adult_mortality, hiv_aids) %>% 
+#   pivot_longer(cols = c(alcohol, bmi, schooling, gdp, percentage_expenditure,polio, diphtheria, adult_mortality, hiv_aids), 
+#                names_to = "variables", values_to = "positive_values") %>% 
+#   mutate(variables = as.factor(variables))
+
+variables_corr <- df_cleaned %>% 
+  select(status, life_expectancy, alcohol, bmi, schooling, gdp,
+                percentage_expenditure, polio, diphtheria,  hiv_aids) %>% 
+  pivot_longer(cols = c(alcohol, bmi, schooling, gdp, percentage_expenditure,polio, diphtheria,  hiv_aids), 
+               names_to = "variables", values_to = "positive_values") %>% 
+  mutate(variables = as.factor(variables))
+
+
+```
+
+```{r, fig.width=12, fig.height=12}
+# Create the faceted plot
+ggplot(variables_corr, aes(y = life_expectancy, x = positive_values, colour = status)) +
+  geom_point(alpha = 0.5) +
+  facet_wrap(~variables, scales = "free_x") +
+  labs(
+    x = "", 
+    y = "Life Expectancy",
+    title = "Life Expectancy vs Key Predictors by Status"
+  )
+ 
+```
+
+We are now starting to see some very clear pictures here. A variable
+like school has a very strong relationship with life expectancy, a
+firming that increase in education results to increase in life
+expectancy. Hiv as well. Other variables have somewhat of strong
+relationships as well, but the smooth chart below illustrates better.
+
+```{r, fig.width=12, fig.height=12}
+
+relationships <- df_cleaned %>% 
+  filter(schooling > 5 ) %>% 
+  select(status,life_expectancy,schooling, alcohol, bmi,  gdp,
+                percentage_expenditure, polio, diphtheria, hiv_aids) %>% 
+  pivot_longer(cols = c(schooling,alcohol, bmi,  gdp, percentage_expenditure,polio, diphtheria, hiv_aids), 
+               names_to = "variables", values_to = "smooth_values") %>% 
+  mutate(variables = as.factor(variables))
+
+
+#create a smooth plot
+ggplot(relationships, aes(y = life_expectancy, x = smooth_values , colour = status)) +
+  geom_smooth() + 
+  facet_wrap(~variables, scales = "free_x")
+  labs(
+    x = "predictor keys", 
+    y = "Life Expectancy",
+    title = "Life Expectancy vs Key Predictors on smooth curve"
+  )
+ 
+```
+
+Now the smooth graph illustrates some variables better, while these are
+not fully liner lines, we see a Variable like hiv and aids having a
+sharp decline as life expectancy increases. Other shapes might not be
+very clear of a strong linear relationships, but these were the
+variables that had less than 0.5 correlation coefficient. Next we we
+will model our data in the next chapter.
+
+We can now start formulating hypothesis on schooling, immunization rate(
+polio and diphtheria) and hiv and aids.
+
+```{=html}
+One note on BMI and Alcohol Variables, the resulting graphs could seam counter intuitive. This is a classic case of correlation is not causation. One hypothesis could be that being able to afford alcohol is an indication of better living conditions hence higher life expectancy, as alcohol could be considered a luxury good. Also, Alcohol is complicated; there are reasons to report it wrongly, and higher onsumption could be a good sign or a bad sign... Also, though it's harmful, it can relieve stress which is also harmful. Hard to get a clear picture. 
+```
+
+## 3.5. HYPOTHESIS
+
+Now that we have some idea on what is going on in the data, we can
+formulate some hypothesis
+
+#### **3.1. Hypothesis one:** 
+
+Hypothesis : Increased years of schooling significantly increase life
+expectancy. Null Hypothesis : There is no significant relationship
+between years of schooling with life expectancy.
+
+#### **3.2. Hypothesis two:** 
+
+Hypothesis : Lower HIV prevalence is significantly associated with
+increased life expectancy.
+
+Null Hypothesis: HIV prevalence does not significantly affect life
+expectancy.
+
+#### **3.3. Hypothesis three:** 
+
+Hypothesis : increased immunization rate of polio and diphtheria are
+significantly associated with increased life expectancy.
+
+Null Hypothesis: Increased immunization rate of polio and diphtheria
+does not have any relationship with life expectancy
+
+#### **3.4. Hypothesis four:** 
+
+Hypothesis : increased percentage_expenditure is significantly
+associated with increased life expectancy. Null Hypothesis: increased
+percentage_expenditure does not have any relationship with life
+expectancy
+
+Now we can assess some models
+
+# 4. MODELING OUR DATA
+
+## 4.1 MULTIPLE LINEAR REGRESSION
+
+Now we will try to predict the outcome variable life expectancy using
+some independent variables. We will also see how much of the life
+expectancy can be explained by the input variables.
+
+I acknowledge that most variables do not have a complete straight line
+in the smooth diagram. For that for school I will get rid of 0-5 years,
+bmi will start from 30 , at the point which relationship is linear. I
+will also be excluding adult mortality
+
+```{r}
+
+#I will start by creating a new data frame df4 with all the numerical factors
+
+df5 <- df_cleaned  %>% 
+  mutate(status = ifelse(status == "Developed", 1, 0)) %>% 
+  select(-country, -year, -status)
+
+#colnames(df5)
+
+```
+
+#### 4.1.1 Prep the data
+
+##### 4.1.1.1. Remove highly correlated variables
+
+Before I start Multiple linear regression, I will check for
+multicollineality
+
+I will proceed to check the independent variables that are highly
+correlated with each other and remove to reduce redundancy. This step is
+critical for the following reasons
+
+-   To prevent incorrect variable selection and difficulty in
+    interpretation. Multicollinearity can lead to the inclusion of
+    irrelevant variables while excluding important ones, skewing the
+    interpretation.
+
+-   To avoid inflated standard errors of the regression coefficients,
+    making it difficult to determine the significance of individual
+    predictors.
+
+-   To prevent overfitting
+
+```{r, fig.width=12, fig.height=12}
+cor_matrix2 <- cor(df2)
+# plot
+corrplot(cor_matrix2, method = "number", type = "upper", 
+         number.cex = 1.25)
+
+```
+
+percentage expenditure and gdp and highly correlated at 0.89, I will
+chose percentage_expenditure since it is good to see what is the
+influence of percentage_expenditure on dependent variable life
+expectancy. Infant deaths and under five deaths are highly correlated. I
+will choose under five deaths with -0.22 with is higher correlated with
+dependent variable life expectancy.
+
+I will remove them from modelling data frame. I will also be removing
+adult mortality to prevent tautology, as mentioned earlier.
+
+```{r}
+
+#I will start by creating a new data frame df4 with all the numerical factors
+
+##df4 <- df4 %>% (select -percentage_expenditure, -infant_deaths)
+
+df4 <- df5 %>% 
+ select(-gdp, -infant_deaths, -adult_mortality)
+
+```
+
+#### 4.1.2 Feature engineering
+
+I will start with a bigger model then carefully select the important
+factors.
+
+```{r}
+model <- lm(life_expectancy ~. , data = df4)
+summary(model)
+
+```
+
+I will try to drop variables here and whichever I drop and the model
+improves, I will keep the new model and drop that variable.
+
+I will start with total expenditure because it has a low p value. We do
+not have enough evidence to reject the null hypothesis that it is
+statistically significant.
+
+```{r}
+# Create progressive models
+# Create progressive models - dropping least significant variables
+model_full <- lm(life_expectancy ~ ., data = df4)
+model_1 <- lm(life_expectancy ~ . -total_expenditure, data = df4)
+model_2 <- lm(life_expectancy ~ . -total_expenditure -measles, data = df4)
+model_3 <- lm(life_expectancy ~ . -total_expenditure -measles -population, data = df4)
+model_4 <- lm(life_expectancy ~ . -total_expenditure -measles -population -alcohol, data = df4)
+model_5 <- lm(life_expectancy ~ . -total_expenditure -measles -population -alcohol -hepatitis_b, data = df4)
+model_6 <- lm(life_expectancy ~ percentage_expenditure + under_five_deaths + hiv_aids + bmi + polio + schooling + diphtheria, data = df4)
+model_7 <- lm(life_expectancy ~ percentage_expenditure + under_five_deaths + hiv_aids + bmi + schooling + diphtheria, data = df4)
+model_8 <- lm(life_expectancy ~ percentage_expenditure + under_five_deaths + hiv_aids + schooling + diphtheria, data = df4)
+model_9 <- lm(life_expectancy ~ percentage_expenditure + hiv_aids + schooling + diphtheria, data = df4)
+model_10 <- lm(life_expectancy ~ hiv_aids + schooling + diphtheria, data = df4)
+model_11 <- lm(life_expectancy ~ schooling + diphtheria, data = df4)
+model_minimal <- lm(life_expectancy ~ schooling, data = df4)
+
+# Extract stats function
+get_stats <- function(model, name) {
+  s <- summary(model)
+  data.frame(
+    Model = name,
+    Variables = length(s$coefficients) - 1,
+    R_squared = round(s$r.squared, 4),
+    Adj_R_squared = round(s$adj.r.squared, 4),
+    AIC = round(AIC(model), 1),
+    BIC = round(BIC(model), 1),
+    RMSE = round(sqrt(mean(s$residuals^2)), 2)
+  )
+}
+
+# Create comparison table
+# Create comparison table
+models <- list(
+  list(model_full, "Full (12 vars)"),
+  list(model_1, "Drop total_exp"),
+  list(model_2, "Drop measles"),
+  list(model_3, "Drop population"),
+  list(model_4, "Drop alcohol"),
+  list(model_5, "Drop hepatitis_b"),
+  list(model_6, "Drop polio"),
+  list(model_7, "Drop bmi"),
+  list(model_8, "Drop under_five"),
+  list(model_9, "Drop percentage_exp"),
+  list(model_10, "Drop hiv_aids"),
+  list(model_11, "Drop diphtheria"),
+  list(model_minimal, "Minimal (1 var)")
+)
+
+
+comparison <- do.call(rbind, lapply(models, function(x) get_stats(x[[1]], x[[2]])))
+print(comparison, row.names = FALSE)
+
+# Best model by criteria
+cat("\nBest by AIC:", comparison$Model[which.min(comparison$AIC)])
+cat("\nBest by BIC:", comparison$Model[which.min(comparison$BIC)])
+cat("\nBest by Adj R²:", comparison$Model[which.max(comparison$Adj_R_squared)])
+```
+
+##### 4.1.2.1 Rationale for Variable Elimination
+
+Four variables were removed from the initial full model based on both
+statistical and practical considerations:
+
+**Variables Removed:**
+
+total_expenditure
+
+measles
+
+population
+
+alcohol
+
+### Statistical Justification
+
+The decision to remove these variables was informed by two key criteria:
+
+#### 1. Statistical Insignificance
+
+All four removed variables demonstrated **non-significant p-values** in
+the full model:
+
+total_expenditure: p = 0.473 (p \> 0.05)
+
+measles: p = 0.169 (p \> 0.05)
+
+population: p = 0.049 (borderline significance)
+
+alcohol: p = 0.071 (p \> 0.05)
+
+These high p-values indicate that these variables do not provide
+statistically reliable contributions to predicting life expectancy when
+other variables are present in the model.
+
+#### 2. Minimal Impact on Model Performance
+
+The removal of these variables resulted in negligible loss of
+explanatory power:
+
+| Model         | R²     | Adj R² | Performance Loss |
+|---------------|--------|--------|------------------|
+| Full Model    | 0.7639 | 0.7629 | \-               |
+| After Removal | 0.7630 | 0.7624 | 0.0009 R² loss   |
+
+The **0.0009 decrease in R-squared** represents less than 0.1% loss in
+explained variance, demonstrating that these variables contribute
+minimal unique information to the model.
+
+### Model Parsimony Principle
+
+Following the principle of parsimony (Occam's razor), simpler models are
+preferred when they achieve comparable performance to more complex
+alternatives. The removal of these four variables:
+
+-   **Reduces model complexity** without sacrificing predictive accuracy
+
+-   **Improves interpretability** by focusing on meaningful predictors
+
+-   **Decreases risk of overfitting** by eliminating weak predictors
+
+-   **Enhances model stability** across different samples
+
+After trying to drop one variable and a time, the final model is,
+
+```{r}
+
+model_1 <- lm(life_expectancy ~ schooling +hiv_aids+
+                diphtheria+ polio + under_five_deaths+ bmi+  hepatitis_b+percentage_expenditure, data = df4)
+summary(model_1)
+
+```
+
+### First check the assumptions before making conclusions
+
+```{r}
+par(mfrow = c(2, 3)) #layout my charts into two rows and 3 columsn
+
+plot(model_1, which = 1:5)  
+```
+
+1.  **Residuals vs fitted** - Residuals are randomly scattered around
+    the center line of zero with no pattern meaning residuals have
+    constant variance. This condition is met in our model.
+2.  The normality quantile plot of the residuals, **Q-Q Standardized
+    Residuals**, shows that the errors are normally distributed
+3.  For the fitted values vs the square root of standardized residuals
+    in **Scale-Location**, The red line is horizontal meaning assumption
+    of homoscedasticity is met. Also, there is no clear pattern i.e the
+    spread of the residuals is roughly equal to all fitted values.
+4.  For the cooks distance, when I look at the standardized residuals in
+    the **Residuals vs Leverage** plot, no point lies outside cook's
+    distance, so there is no influential points.
+
+Now that our residuals assumptions have been met, we can go ahead and
+interpret our model.
+
+```{r}
+
+#options(scipen = 999) ##remove scietific notation
+
+summary(model_1)
+
+```
+
+### Model interpretation.
+
+In this model, our Adj. R-squared tells us that our model can explain
+80% of life expectancy's variability, which is good. The p value of f
+F-statistic is also statistically significant, therefor, at least one of
+our predictor variables can explain life expectancy.
+
+Coming back to our hypothesis that we had formulated earlier, we can now
+assess the p values from the model
+
+#### Factors affect life expectancy
+
+For the following variables, we have very good evidence to reject the
+null hypothesis
+
+1.***Hypothesis one:*** Hypothesis : Increased years of schooling
+significantly increase life expectancy.
+
+-   **schooling** is Statistically Significant with a p value of less
+    than 0.001. We have good evidence to reject the null hypothesis and
+    conclude that schooling is statistically associated with life
+    expectancy, and while holding all other factors constant, for every
+    year increase in schooling, life expectancy increases by 1.28.
+
+2.***Hypothesis two:*** Hypothesis : Lower adult mortality rates and
+lower HIV prevalence are significantly associated with increased life
+expectancy.
+
+-   **hiv_aids** is also statistically significant with a p value of \<
+    0.001. We have good evidence to reject the null hypothesis. For
+    every extra hiv case reported, holding other factors, life
+    expectancy reduces by 0.70
+
+3.***Hypothesis three:*** Hypothesis : increased immunization rate is
+significantly associated with increased life expectancy.
+
+-   **polio** and **diphtheria** p values all \< 0.001 there for we have
+    good evidence to reject the null hypothesis and confident say that
+    these values can explain life expectancy. For every percentage
+    increase in polio immunization among one year olds, life expectancy
+    increases by 0.038. Similarly for diphtheria, for every percent
+    increase in DTP3 immunization, life expectancy increases by 0.04.
+
+-   **Hepatitis b** is also statistically significant, having a p value
+    of \< 0.001. It follows that we have good evidence to reject null
+    hypotheses. Hepatitis B is associated with life expectancy and we
+    can infer that for every percent increase in hepatitis b
+    immunization among one year olds, life expectancy reduces by 0.017
+
+4.***Hypothesis four:*** Hypothesis : increased percentage_expenditure
+is significantly associated with increased life expectancy.
+
+-   **percentage expenditure** is also statistically significant, having
+    a p value of \< 0.001. It follows that we have good evidence to
+    reject null hypotheses. percentage expenditure is associated with
+    life expectancy and we can infer that for every percentage
+    expenditure increase, life expectancy increases by 0.0005
+
+## Further confirmatory analysis
+
+Predicted values vs Fitted values
+
+```{r}
+
+
+df4$predicted_life_expectancy <- predict(model_1)
+
+## Check for fitted values vs predicted values to see how the model performed.
+ ggplot(df4)+
+  aes(x = life_expectancy, y=predicted_life_expectancy)+
+  geom_point() +
+   geom_smooth(method = "lm", colour = "red")+
+   labs(title = "Fitted life expectancy vs Predicted life expectancy")
+
+##The predicted values correlated very well with the fitted values and the trend is very evident. 
+
+```
+
+From the model we built, we see clearly that the the predicted values
+are correlated very well with the fitted values and the trend is very
+evident.
+
+Here, we look into key factors of life expectancy.
+
+```{r, fig.width=12, fig.height=12}
+
+##Ploting life expectancy predicted values and fitted values, and seeing how they relate to factors affecting life expectancy
+plot_1<- ggplot(df4)+
+  aes(x = life_expectancy, y=predicted_life_expectancy ,colour = schooling)+
+  geom_point()+
+  geom_smooth(method = "lm", colour = "red")+
+   labs(title = "Schooling")
+
+
+## Test with school which is one of the major drivers of life expectancy  
+
+plot_3<- ggplot(df4)+
+  aes(x = life_expectancy, y=predicted_life_expectancy , colour = hiv_aids)+
+  geom_point() + scale_color_gradient(limits = c(0, 15) ) + #reduce the scale so as to see the relationship better
+   geom_smooth(method = "lm", colour = "red")+
+   labs(title = "hiv_aids")
+
+
+
+
+plot_5<- ggplot(df4)+
+  aes(x = life_expectancy, y=predicted_life_expectancy , colour = diphtheria)+
+  geom_point()+scale_color_gradient(limits = c(23, 100) ) +
+  geom_smooth(method = "lm", colour = "red")+
+   labs(title = "diphtheria")
+
+plot_6<- ggplot(df4)+
+  aes(x = life_expectancy, y=predicted_life_expectancy , colour = hepatitis_b)+
+  geom_point()+
+  geom_smooth(method = "lm", colour = "red")+
+   labs(title = "hepatitis_b")
+
+plot_7<- ggplot(df4)+
+  aes(x = life_expectancy, y=predicted_life_expectancy , colour = percentage_expenditure)+
+  geom_point()+
+  geom_smooth(method = "lm", colour = "red")+
+   labs(title = "percentage_expenditure")
+
+plot_grid(plot_1, plot_3, plot_5,plot_6, plot_7, ncol = 2)
+
+```
+
+In conclusion, factors affecting life expectancy are; Schooling,
+Hiv_Aids and Immunization rate (diphtheria, polio and hepatitis b)
+
+## 4.1 PRINCIPAL COMPONENT ANALYSIS
+
+In this technique, we will use PCA to understand our data more by
+reducing it from high-dimensional space to a smaller dimensional space
+that is easy to understand.
+
+We will run PCA on the data frame below that has predictor variables
+only and does not have non-numerical variables
+
+```{r}
+
+# drop unneeded variables
+
+#I will store these changes in a new data frame df2, so as not to tamper
+# with the original data frame.
+
+df3 <- df_cleaned %>%
+  mutate(status = ifelse(status == "Developed", 1, 0)) %>% 
+  select(-country, -year, -life_expectancy)
+head(df3)
+
+```
+
+### Summary of pca
+
+```{r}
+pca<- prcomp(df3, scale. = TRUE) ## scale the data to make sure the end results are not influenced by scales of the data
+summary(pca)
+
+
+```
+
+From this summary, we can see that PC1 can explain 28% of the
+variability of our data, PC2 cumulatively with PC1 holds 44% of
+information, PC3 together with PC1 and PC2 can explain 54% of
+variability in the data. By choosing PC1 to PC3 which gives us at least
+50% of info in the data, we have reduced our variables from 15 to 3, as
+shown in the diagram below.
+
+```{r}
+
+plot(pca, type="lines")
+
+```
+
+We can safely ignore PC 4, 5, 6, to 10. while this makes us loose Little
+bit of some predictability power, it is not so much.
+
+**Visualizing, PC1 and PC2**
+
+```{r}
+## weightings where the data ends up in the new quadrant
+scores <- pca$x %>% as.data.frame()
+##head(scores)
+
+df_pca <- cbind(df3, scores)
+
+
+ggplot(df_pca) +
+  aes(x=PC1, y = PC2, colour = status)+
+  geom_point()+
+  labs(title = "Principal Component Analysis of Life expectancy data set")
+
+
+
+
+loadings <- pca$rotation %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column("metric")
+```
+
+From the above graph, we see two status developed (1) and developing (0)
+when project to two dimension space, there is some distinct difference
+at a point, the developing countries are more spread out. Additionally,
+developed countries mainly live in PC1. Next, we translate principle
+component analysis to graphs so that we can interpret what each PCA
+represents
+
+### In-depth analysis into each Principle component
+
+#### Principal component 1
+
+```{r}
+
+## Plot PC1 in a column bar chart
+ggplot(loadings) +
+  aes(y = PC1, x = metric) + 
+  geom_col() +              
+  coord_flip() +          ## flip the axes to improve readability
+  labs(
+    title = "Loadings for PC1",
+    x = "Metric",
+    y = "Loadings"
+  )
+
+# Extract the PC1 loadings into a data frame
+pc1_loadings <- pca$rotation %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("Variable") %>%
+  select(Variable, PC1) %>% 
+  arrange(PC1)
+
+pc1_loadings <- pc1_loadings %>%
+  mutate(PC1 = ifelse(PC1 > 0.25 | PC1 < -0.25, paste0("**", PC1, "**"), PC1)) ## If if the value is greater than 0.25 or smaller than 0.25, make it bold
+
+# Print the table
+knitr::kable(pc1_loadings, caption  = "pc1 loadings")
+
+```
+
+**Inference**
+
+Countries that are high in PC1 are very high in schooling, and high in
+gdp and high in bmi, high in alcohol consumption , low in adult
+mortality. The first principal component increases with increase in
+schooling, and increase in bmi and increase in alcohol and decrease with
+increase in adult mortality. So it is a measure if quality of education,
+high gdp and high consumption of luxury goods(alcohol, fast food for
+bmi). The countries follow the pattern of developed countries we saw
+earlier. and developed countries had high life expectancy.
+
+```{=html}
+This PC may be interpreted as good healthcare society
+```
+
+#### Principal component 2
+
+```{r}
+## Plot PC2 in a column bar chart
+ggplot(loadings) +
+  aes(y = PC2, x = metric) +  
+  geom_col() +               
+  coord_flip() +             # Flip axes for readability
+  labs(
+    title = "Loadings for PC2",
+    x = "Metric",
+    y = "Loadings"
+  ) 
+
+# Extract the PC1 loadings into a data frame
+pc2_loadings <- pca$rotation %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("Variable") %>%
+  select(Variable, PC2) %>% 
+  arrange(PC2)
+
+
+pc2_loadings <- pc2_loadings %>%
+  mutate(PC2 = ifelse(PC2 > 0.25 | PC2 < -0.25, paste0("**", PC2, "**"), PC2)) ## If if the value is greater than 0.25 or smaller than 0.25, make it bold
+
+# Print the table
+knitr::kable(pc2_loadings, caption = "pc2 loadings")
+```
+
+**Inference** The second principle component increases with increase in
+Infant deaths, under five deaths, population and number of reported
+measles cases/1000 population .This suggests that countries with high
+infant deaths, high under five deaths, and high measles numbers tend to
+have high population. This principle component represents developing
+countries, as seen earlier and in the pca plot.
+
+#### Principal component 3
+
+```{r}
+
+
+## Plot PC3 in a column bar chart
+
+
+ggplot(loadings) +
+  aes(y = PC3, x = metric) +  
+  geom_col() +               
+  coord_flip() +             # Flip axes for readability
+  labs(
+    title = "Loadings for PC3",
+    x = "Metric",
+    y = "Loadings"
+  )
+
+
+# Extract the PC3 loadings into a data frame
+pc3_loadings <- pca$rotation %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("Variable") %>%
+  select(Variable, PC3) %>% 
+  arrange(PC3)
+
+
+pc3_loadings <- pc3_loadings %>%
+  mutate(PC3 = ifelse(PC3 > 0.25 | PC3 < -0.25, paste0("**", PC3, "**"), PC3)) ## If if the value is greater than 0.25 or smaller than 0.25, make it bold
+
+# Print the table
+knitr::kable(pc3_loadings, caption = "pc3 loadings")
+```
+
+**Inference** The third principle component increases with
+hepatitis_b,polio, diphtheria immunization coverage, which is good, and
+increases with decrease in gdp and percentage expenditure. This PCA
+captures high positive public health while having challenges of
+government expenditure on health and low gdp. This means that places
+with high immunization rate tend to have low economic indicators. I cant
+really tell which countries are these in the third dimension.
+
+#### Summary
+
+In summary, developed countries are represented by pc1 and they have
+characteristics of high education, high in gdp, have lower deaths and
+consume for luxury goods like alcohol and foods that cause high bmi.
+
+Developing countries on the other hand, are represented by pc1 and they
+have characteristics of high population, high infant deaths and high
+under five deaths, and high measles rates.
+
+\newpage
+
+######################################################################################################################################################## 
+
+# Q.2 - EXECUTIVE SUMMARY
+
+Life expectancy can be determined by many factors including economic,
+social and heath factors. Countries with limited access to heath care
+might for instance experience high mortality rates - both adults and
+infants, high disease rates and so forth. Due to advancements in
+technology, policy making and medicine in the last few years, it has
+become imperative to understand the factors affecting life expectancy
+and act on them. This report provides a detailed analysis of factors
+affecting life expectancy and provides data driven recommendations to
+governments and policy makes on on how they can improve life expectancy.
+
+## Key findings
+
+1.**Increase in number of years in school increases the life
+expectancy** The number of years a person stays in school is very
+important for their longevity. This report found a compelling evidence
+of the importance of school, concluding that for every extra year that
+someone stays in school, their life expectancy increases by 1.05 years.
+This was evident in developed countries which have prioritized resource
+allocation on education. Developed countries had higher life expectancy
+because on average, the number of years spent on education is higher
+compared to their counterparts.
+
+The table below shows that developed countries have higher education
+levels on average. It also shows life expectancy of developed countries
+being on the higher side compared to developing countries.
+
+```{r}
+df_cleaned %>% ggplot(aes(y = life_expectancy, x = schooling, colour = status)) +
+  geom_point(alpha = 0.5) +
+  facet_wrap(~status) +
+  labs(
+    x = "", 
+    y = "Life Expectancy",
+    title = "Life Expectancy Increases with increase in education"
+  )
+```
+
+**Recommendation:** This supports a call for government' increased
+spending and investment on education as a important step towards
+improving life expectancy.
+
+2.**Reduced hiv_aids numbers will increase life span.**
+
+The report found that low levels of hiv were associate with 0.5 years
+increase in life expectancy. This is because high levels of hiv and aids
+numbers increase mortality rate, leading to reduced life expectancy. The
+report found that countries that had high levels of hiv and aids had
+high levels of mortality, underscoring the importance of preventing more
+cases.
+
+**Recommendation** Governments and policy makes should increase funding
+to hiv and aids awareness campaigns, Increase education and
+affordability on antiviral hiv medicine for the ailing aids population.
+
+3.**Expand Immunization Programs**
+
+Immunization was also found to be a key factor affecting life
+expectancy. Regions with low immunization rate of polio, hepatitis B and
+diphtheria saw a decline in life expectancy.
+
+**Recommendation** Governments should increase outreach for vaccination
+amongst one year olds in hospitals, communities and in schools
+
+3.**percentage expenditure Increase** Increase in government expenditure
+on healthcare was found to positively influence life expectancy.
+
+```{r}
+df_cleaned %>% ggplot(aes(y = life_expectancy, x = percentage_expenditure, colour = status)) +
+  geom_point(alpha = 0.5) +
+  facet_wrap(~status) +
+  labs(
+    x = "", 
+    y = "Life Expectancy",
+    title = "Life Expectancy Increases with increase in percentage expenditure"
+  )
+```
+
+The chart above shows that life expectancy is increasing with increase
+in percentage expenditure. I it is especially evident in developed
+coutries.
+
+**Recommendation** Governments should consider allocating more budget on
+healthcare.
+
+In summary, this report shows how data analysis exposes the factors that
+influence life expectancy and highlights it as a key tool for
+organizations, both private and non private. By understanding these
+factors, governments and organizations can drive meaningful change,
+ensuring that people live longer and healthier lives. Moving forward,
+the ability to leverage data will remain crucial to solving pressing
+global challenges.
